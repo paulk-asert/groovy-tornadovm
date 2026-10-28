@@ -59,6 +59,14 @@ Groovy build that includes them:
 
 Once released, `-PwithParallel -PgroovyVersion=<version>` will do.
 
+## NVIDIA GPUs on Colab
+
+[`notebooks/tornadovm-cuda-colab.ipynb`](notebooks/tornadovm-cuda-colab.ipynb) runs the examples
+on TornadoVM's CUDA backend in a Google Colab GPU runtime, using `bash` cells from the normal Python runtime:
+it installs JDK 21 and the `jdk21-cuda-linux-amd64` SDK, then runs the Gradle tasks above.
+[Open it in Colab](https://colab.research.google.com/github/paulk-asert/groovy-tornadovm/blob/main/notebooks/tornadovm-cuda-colab.ipynb).
+This notebook is a prototype and hasn't been run on Colab yet.
+
 ## License
 
 Apache License 2.0, see [LICENSE](LICENSE).
