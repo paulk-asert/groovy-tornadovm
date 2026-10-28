@@ -76,7 +76,8 @@ class GpuKernelTransform extends AbstractASTTransformation {
                     def lt = typeOf(left), rt = typeOf(right)
                     if ((isFloat(lt) || isFloat(rt)) && isIntOrFloat(lt) && isIntOrFloat(rt)) {
                         // int operands are widened to float first, as javac would
-                        def bin = new BinaryExpression(toFloat(left, lt), e.operation, toFloat(right, rt))
+                        def bin = new BinaryExpression(toFloat(left, lt), e.operation,
+                                toFloat(right, rt))
                         bin.sourcePosition = e
                         return castX(float_TYPE, bin)
                     }
