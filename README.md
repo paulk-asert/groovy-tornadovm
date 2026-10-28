@@ -65,7 +65,7 @@ Once released, `-PwithParallel -PgroovyVersion=<version>` will do.
 on TornadoVM's CUDA backend in a Google Colab GPU runtime, using `bash` cells from the normal Python runtime:
 it installs JDK 21 and the `jdk21-cuda-linux-amd64` SDK, then runs the Gradle tasks above.
 [Open it in Colab](https://colab.research.google.com/github/paulk-asert/groovy-tornadovm/blob/main/notebooks/tornadovm-cuda-colab.ipynb).
-This notebook is a prototype and hasn't been run on Colab yet.
+It has been run on a Colab Tesla T4 runtime (CUDA 13.0), where the `KernelContext` examples work unchanged.
 
 ## License
 
