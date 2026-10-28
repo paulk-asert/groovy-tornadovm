@@ -1,0 +1,82 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// TornadoVM is not used from Maven: its runtime ships as an SDK with native drivers.
+// Point TORNADOVM_HOME (or -PtornadoHome) at an unpacked SDK, e.g. sdk/tornadovm-8.0.0-metal.
+def tornadoHome = providers.gradleProperty('tornadoHome')
+    .orElse(providers.environmentVariable('TORNADOVM_HOME'))
+    .orElse(layout.projectDirectory.dir('sdk/tornadovm-8.0.0-metal').asFile.path)
+
+// -PgroovyHome=/path/to/groovy-install uses a local Groovy (e.g. a snapshot build)
+// instead of org.apache.groovy:groovy:$groovyVersion from Maven Central
+def groovyHome = providers.gradleProperty('groovyHome')
+
+subprojects {
+    apply plugin: 'groovy'
+
+    repositories {
+        mavenCentral()
+    }
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    dependencies {
+        if (groovyHome.present) {
+            // just the core jar, e.g. lib/groovy-7.0.0-SNAPSHOT.jar
+            implementation files(new File(groovyHome.get(), 'lib').listFiles().findAll { it.name ==~ /groovy-\d.*\.jar/ })
+        } else {
+            implementation "org.apache.groovy:groovy:$groovyVersion"
+        }
+    }
+
+    if (groovyHome.present) {
+        // stop Gradle inferring (and trying to download) a compiler matching the local jar's version
+        tasks.withType(GroovyCompile).configureEach {
+            groovyClasspath = fileTree("${groovyHome.get()}/lib") { include '*.jar' }
+        }
+    }
+}
+
+configure([project(':examples')] + (findProject(':parallel') ? [project(':parallel')] : [])) { p ->
+    dependencies {
+        compileOnly files("${tornadoHome.get()}/share/java/tornado/tornado-api-${tornadoVersion}.jar")
+        compileOnly project(':gpukernel')
+    }
+
+    def launcher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+
+    // one runXxx task per example; extra launcher flags via -PtornadoFlags="--printKernel"
+    p.ext.example = { String name ->
+        p.tasks.register("run$name", Exec) {
+            group = 'tornadovm'
+            description = "Runs $name on the default TornadoVM device"
+            dependsOn p.tasks.named('classes')
+            workingDir = p.layout.buildDirectory.get().asFile
+            doFirst {
+                workingDir.mkdirs()
+                def flags = providers.gradleProperty('tornadoFlags').getOrElse('').tokenize()
+                def cp = (p.sourceSets.main.output.classesDirs.files + p.configurations.runtimeClasspath.files).join(File.pathSeparator)
+                environment 'JAVA_HOME', launcher.get().metadata.installationPath.asFile.path
+                environment 'TORNADOVM_HOME', tornadoHome.get()
+                commandLine(["${tornadoHome.get()}/bin/tornado", *flags, '--classpath', cp, name])
+            }
+        }
+    }
+}
