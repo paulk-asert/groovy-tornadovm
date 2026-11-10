@@ -16,6 +16,10 @@
 
 rootProject.name = 'groovy-tornadovm'
 
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
 include 'gpukernel', 'examples'
 
 // The @Parallel examples need a Groovy with GROOVY-12540, GROOVY-12541 and GROOVY-12542;
