@@ -70,8 +70,9 @@ configure([project(':examples')] + (findProject(':parallel') ? [project(':parall
     def launcher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
 
     // one runXxx task per example; extra launcher flags via -PtornadoFlags="--printKernel"
-    p.ext.example = { String name ->
-        p.tasks.register("run$name", Exec) {
+    // options: task (task name suffix), args (program arguments)
+    p.ext.example = { String name, Map opts = [:] ->
+        p.tasks.register("run${opts.task ?: name}", Exec) {
             group = 'tornadovm'
             description = "Runs $name on the default TornadoVM device"
             dependsOn p.tasks.named('classes')

@@ -1,7 +1,8 @@
 # Groovy on the GPU with TornadoVM
 
-Companion code for the Apache Groovy blog post
-[Running Groovy on the GPU with TornadoVM](https://groovy.apache.org/blog/groovy-tornadovm).
+Companion code for the Apache Groovy blog posts
+[Running Groovy on the GPU with TornadoVM](https://groovy.apache.org/blog/groovy-tornadovm) and
+[Whiskey Clustering with Groovy and Apache Flink](https://groovy.apache.org/blog/groovy-flink).
 
 It shows Groovy code compiled to GPU kernels by [TornadoVM](https://www.tornadovm.org) 8.0.0:
 
@@ -21,6 +22,7 @@ It shows Groovy code compiled to GPU kernels by [TornadoVM](https://www.tornadov
 | `gpukernel/` | the `@GpuKernel` AST transformation |
 | `examples/` | `VectorAdd` and `Mandelbrot` using `KernelContext` (Groovy 6.0.0) |
 | `parallel/` | `VectorAddParallel` and `MandelbrotParallel` using `@Parallel` loops (needs the fixes above) |
+| `flink/` | K-means clustering of whisky flavour profiles on Apache Flink 2.3, with the assignment step on the CPU or the GPU |
 
 ## Setup
 
@@ -79,6 +81,49 @@ The Mandelbrot kernel took about 9 ms per 3840×3200 image (13.9 ms for the `@Pa
 built with a Groovy 6.0.1-SNAPSHOT), against about 2.4 s for a parallel stream on the 16 CPU cores.
 Unlike Apple GPUs, this GPU accepts double-precision kernels. A `double` version of the
 Mandelbrot kernel ran, but about 9.5× slower than the `float` one.
+
+## Whisky clustering with Apache Flink
+
+The `flink` subproject clusters the flavour profiles of 86 Scotch whiskies with a hand-written
+K-means on the Flink 2.3 DataStream API, running on a local Flink mini cluster.
+Each iteration is a bounded (batch) job. The parsed profiles are cached with `DataStream.cache()`
+after the first job, so later iterations don't re-read the file. A small custom operator, `AssignOperator`, buffers the
+profiles reaching each parallel instance and assigns them to their nearest centroid in one batch,
+using either `CpuAssigner` or `GpuAssigner`, a TornadoVM `KernelContext` kernel written with `@GpuKernel`.
+
+```
+./gradlew :flink:runWhiskeyKMeansCpu       # plain Flink application, no TornadoVM needed
+./gradlew :flink:runWhiskeyKMeansGpu       # same job, assignment step on the GPU
+```
+
+To try something bigger, generate a synthetic data set (4 million jittered copies of the real
+profiles, in 4 files) and time the assignment step:
+
+```
+./gradlew :flink:generateWhiskies
+./gradlew :flink:runWhiskeyKMeansCpu -Pdata=build/whiskies -Ptiming -Piterations=4
+./gradlew :flink:runWhiskeyKMeansGpu -Pdata=build/whiskies -Ptiming -Piterations=4 -Pk=50
+```
+
+Add `-Pnocache` to re-read and parse the data in every iteration instead.
+
+A few things in the code work around problems found along the way:
+
+* `WhiskeyKMeans` starts one `MiniCluster` and submits every job to it. A cached stream only
+  survives between jobs run on the same cluster, but local execution starts a new mini cluster
+  for each job, so the cache would silently be rebuilt every iteration.
+* The source's parallelism is set explicitly. On a small input Flink infers a parallelism of 1 for
+  the source, so the cache is written as one partition, and the next job, at parallelism 4, fails
+  with `ClusterDatasetCorruptedException`.
+
+* `AssignOperator` is used instead of `fullWindowPartition().mapPartition(...)`. In Flink 2.x,
+  `MapPartitionOperator` calls the user function on a separate thread, and records it emits
+  can race with the task thread when written to the network. With the local mini cluster that gave
+  corrupted records, `IllegalArgumentException: Cannot append empty data` failures and hangs.
+* `AssignOperator` copies `batch*.f1` with a plain loop. Under `@CompileStatic`, Groovy 6.0.0
+  compiles the spread-dot operator into a loop that leaves the result list on the operand stack,
+  and HotSpot can't compile such a loop on-stack (`COMPILE SKIPPED: OSR starts with non-empty stack`).
+  In a method that runs once over a large list, the loop stays interpreted, about 10 times slower.
 
 ## NVIDIA GPUs on Colab
 

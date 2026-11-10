@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<!--
+  SPDX-License-Identifier: Apache-2.0
+  Card image for the blog post. Render with:
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu \
+    --screenshot=groovy_flink.png --window-size=1176,672 --force-device-scale-factor=2 \
+    --hide-scrollbars file://$PWD/flink_card.html
+-->
+<html><head><meta charset="utf-8"><style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:1176px; height:672px; background:#10141d;
+    font-family:-apple-system,'Segoe UI',Roboto,sans-serif; color:#e8edf4;
+    padding:34px 52px 26px; display:flex; flex-direction:column; overflow:hidden; }
+  .top { display:flex; justify-content:space-between; align-items:baseline; }
+  .kicker { color:#6cb6ff; font-size:15px; font-weight:700; letter-spacing:3.5px; }
+  .toplabel { color:#8b949e; font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:14px; }
+  h1 { font-size:41px; font-weight:800; line-height:1.15; margin-top:12px; letter-spacing:-0.6px; }
+  h1 .accent { color:#6cb6ff; }
+  .byline { font-size:17px; color:#8b949e; margin-top:7px; }
+  .byline b { color:#b7c1cc; font-weight:600; }
+  .panels { display:flex; gap:20px; margin-top:16px; flex:1; min-height:0; }
+  .panel { background:#161b26; border:1px solid #2a3140; border-radius:12px;
+    padding:14px 18px 12px; display:flex; flex-direction:column; }
+  .code { flex:1.42; border-left:3px solid #6cb6ff; }
+  .side { flex:1; display:flex; flex-direction:column; gap:14px; min-width:0; }
+  .spider { border-left:3px solid #f0b35e; flex:1.25; padding-bottom:8px; }
+  .spiderrow { display:flex; gap:8px; align-items:center; flex:1; margin-left:-12px; }
+  .results { border-left:3px solid #4caf7d; flex:1; }
+  .pill { display:inline-block; font-size:12px; font-weight:700; letter-spacing:2.3px;
+    padding:4px 12px; border-radius:999px; margin-bottom:9px; align-self:flex-start; }
+  .pill.c { color:#6cb6ff; border:1px solid #3b6a99; }
+  .pill.a { color:#7ee787; border:1px solid #3f8b56; }
+  .pill.o { color:#f0b35e; border:1px solid #8a6a35; }
+  #radar { flex-shrink:0; }
+  pre { font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12.6px; line-height:1.45; color:#e8edf4; }
+  .kw { color:#79c0ff; } .ann { color:#f0b35e; } .num { color:#f0b35e; } .mut { color:#768390; } .str { color:#a5d6a1; }
+  .hl { background:rgba(108,182,255,0.16); border-radius:3px; padding:0 3px; color:#e8edf4; font-weight:700; }
+  .members { font-size:13px; min-width:0; color:#8b949e; line-height:1.45; }
+  .members b { display:block; color:#e8edf4; font-size:15px; margin-bottom:3px; }
+  .bar { display:grid; grid-template-columns:112px 1fr 44px; align-items:center; gap:10px; margin:4px 0; font-size:13.5px; color:#b7c1cc; }
+  .bar .track { height:20px; }
+  .bar .fill { height:100%; border-radius:4px; background:#3a4558; }
+  .bar.cache .fill { background:#3b6a99; }
+  .bar.gpu .fill { background:#4caf7d; }
+  .bar .v { font-weight:700; color:#e8edf4; text-align:right; font-variant-numeric:tabular-nums; }
+  .bar.gpu .v { color:#7ee787; }
+  .note { margin-top:auto; font-size:13px; color:#8b949e; }
+  .note b { color:#e8edf4; }
+  .footer { display:flex; justify-content:space-between; align-items:baseline; margin-top:auto; padding-top:16px; }
+  .takeaway { font-size:16.5px; color:#b7c1cc; }
+  .takeaway b { color:#e8edf4; }
+  .site { color:#8b949e; font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:14px; }
+</style></head><body>
+  <div class="top">
+    <div class="kicker">APACHE GROOVY &#183; APACHE FLINK &#183; TORNADOVM</div>
+    <div class="toplabel">Flink 2.3.0 &#183; TornadoVM 8.0.0 &#183; Apple M4 Pro</div>
+  </div>
+  <h1>Cache the data, <span class="accent">then the GPU pays off</span></h1>
+  <div class="byline">Clustering whiskies with <b>K-means</b> on <b>Flink 2.3</b>, the hot loop a <b>Groovy GPU kernel</b></div>
+
+  <div class="panels">
+    <div class="panel code">
+      <span class="pill c">WHISKEYKMEANS.GROOVY &#183; GPUASSIGNER.GROOVY</span>
+<pre>env.fromSource(source, noWatermarks(), <span class="str">'whiskey'</span>)
+    .map(WhiskeyKMeans::parse).returns(POINT)
+    <span class="hl">.cache()</span>  <span class="mut">// parse once, reuse in every iteration</span>
+
+<span class="ann">@GpuKernel</span>
+<span class="kw">static void</span> nearest(KernelContext ctx, FloatArray points, FloatArray centroids,
+                    IntArray out, <span class="kw">int</span> n, <span class="kw">int</span> k, <span class="kw">int</span> d) {
+    <span class="kw">int</span> i = ctx.globalIdx
+    <span class="kw">if</span> (i &lt; n) {
+        <span class="kw">int</span> best = <span class="num">0</span>; <span class="kw">float</span> bestDist = <span class="num">0.0f</span>
+        <span class="kw">for</span> (<span class="kw">int</span> c = <span class="num">0</span>; c &lt; k; c++) {
+            <span class="kw">float</span> dist = <span class="num">0.0f</span>
+            <span class="kw">for</span> (<span class="kw">int</span> j = <span class="num">0</span>; j &lt; d; j++) {
+                <span class="kw">float</span> diff = points.get(i * d + j) - centroids.get(c * d + j)
+                dist = dist + diff * diff
+            }
+            <span class="kw">if</span> (c == <span class="num">0</span> || dist &lt; bestDist) { bestDist = dist; best = c }
+        }
+        out.set(i, best)
+    }
+}</pre>
+    </div>
+
+    <div class="side">
+      <div class="panel spider">
+        <span class="pill o">ONE OF 5 CLUSTERS &#183; 86 REAL WHISKIES</span>
+        <div class="spiderrow">
+        <svg id="radar" width="262" height="196" viewBox="-150 -112 300 224"></svg>
+        <div class="members">
+          <b>Big, smoky &amp; medicinal</b>
+          Ardbeg, Caol Ila, Clynelish, Isle of Jura, Lagavulin, Laphroig, Oban, Old Pulteney, Talisker
+        </div>
+        </div>
+      </div>
+      <div class="panel results">
+        <span class="pill a">SECONDS PER ITERATION &#183; K=100</span>
+        <div class="bar"><span>CPU, re-parse</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="v">3.95</span></div>
+        <div class="bar cache"><span>CPU, cached</span><div class="track"><div class="fill" style="width:63.5%"></div></div><span class="v">2.51</span></div>
+        <div class="bar gpu"><span>GPU, cached</span><div class="track"><div class="fill" style="width:40.3%"></div></div><span class="v">1.59</span></div>
+        <div class="note">4M whiskies &#183; assigning 1M: <b>969 ms</b> CPU, <b>91 ms</b> GPU</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="takeaway"><b>Amdahl's law:</b> a 10&#215; faster kernel only shows once the parsing is gone.</div>
+    <div class="site">groovy.apache.org/blog</div>
+  </div>
+
+<script>
+  // centroid of the peaty cluster from the 86-whisky run
+  const labels = ['Body','Sweet','Smoky','Medicinal','Tobacco','Honey','Spicy','Winey','Nutty','Malty','Fruity','Floral'];
+  const values = [3.11,1.44,3.11,2.89,0.56,0.22,1.56,0.44,1.44,1.44,1.33,0.44];
+  const R = 84, ns = 'http://www.w3.org/2000/svg', svg = document.getElementById('radar');
+  const pt = (i, r) => { const a = -Math.PI / 2 + i * 2 * Math.PI / 12; return [r * Math.cos(a), r * Math.sin(a)]; };
+  const add = (tag, attrs, text) => { const e = document.createElementNS(ns, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]); if (text) e.textContent = text; svg.appendChild(e); return e; };
+  for (let ring = 1; ring <= 4; ring++)
+    add('polygon', { points: labels.map((_, i) => pt(i, R * ring / 4).join(',')).join(' '),
+      fill: 'none', stroke: '#2a3140', 'stroke-width': 1 });
+  labels.forEach((l, i) => {
+    const [x, y] = pt(i, R); add('line', { x1: 0, y1: 0, x2: x, y2: y, stroke: '#2a3140', 'stroke-width': 1 });
+    const [lx, ly] = pt(i, R + 9);
+    add('text', { x: lx, y: ly + 4, 'text-anchor': Math.abs(lx) < 4 ? 'middle' : lx > 0 ? 'start' : 'end',
+      fill: '#8b949e', 'font-size': 12, 'font-family': '-apple-system,sans-serif' }, l);
+  });
+  add('polygon', { points: values.map((v, i) => pt(i, R * v / 4).join(',')).join(' '),
+    fill: 'rgba(240,179,94,0.28)', stroke: '#f0b35e', 'stroke-width': 2, 'stroke-linejoin': 'round' });
+</script>
+</body></html>

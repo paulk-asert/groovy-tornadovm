@@ -1,0 +1,57 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+dependencies {
+    implementation "org.apache.flink:flink-streaming-java:$flinkVersion"
+    implementation "org.apache.flink:flink-connector-files:$flinkVersion"
+    runtimeOnly "org.apache.flink:flink-clients:$flinkVersion"
+    runtimeOnly "org.slf4j:slf4j-simple:$slf4jVersion"
+}
+
+// -Pdata=<file or dir> clusters other data, e.g. from generateWhiskies; -Ptiming times the assignment step;
+// -Pnocache re-reads the data in every iteration; -Pk=<clusters> and -Piterations=<max> change the defaults of 5 and 20
+def kmeansArgs = ['timing', 'nocache'].findAll { providers.gradleProperty(it).present } +
+    ['k', 'iterations'].findResults { name -> providers.gradleProperty(name).map { "$name=$it".toString() }.orNull } +
+    providers.gradleProperty('data').map { [file(it).absolutePath] }.getOrElse([])
+
+// the GPU version runs through the tornado launcher
+example 'WhiskeyKMeans', [task: 'WhiskeyKMeansGpu', args: ['gpu', *kmeansArgs]]
+
+def java21 = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+
+// the CPU version is a plain Flink application and doesn't need TornadoVM
+tasks.register('runWhiskeyKMeansCpu', JavaExec) {
+    group = 'application'
+    description = 'Runs WhiskeyKMeans with the assignment step on the CPU'
+    mainClass = 'WhiskeyKMeans'
+    args kmeansArgs
+    // GpuAssigner is never used, but the TornadoVM API must be present to load the classes
+    classpath = sourceSets.main.runtimeClasspath + configurations.compileClasspath
+    javaLauncher = java21
+}
+
+// -Prows=<n> -Pfiles=<n> control the size of the synthetic data set
+tasks.register('generateWhiskies', JavaExec) {
+    group = 'application'
+    description = 'Writes a large synthetic whisky data set to build/whiskies'
+    mainClass = 'WhiskeyGenerator'
+    classpath = sourceSets.main.runtimeClasspath
+    javaLauncher = java21
+    args layout.buildDirectory.dir('whiskies').get().asFile.path,
+        providers.gradleProperty('rows').getOrElse('4000000'),
+        providers.gradleProperty('files').getOrElse('4')
+}

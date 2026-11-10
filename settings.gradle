@@ -20,7 +20,7 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
-include 'gpukernel', 'examples'
+include 'gpukernel', 'examples', 'flink'
 
 // The @Parallel examples need a Groovy with GROOVY-12540, GROOVY-12541 and GROOVY-12542;
 // Groovy 6.0.0 fails to compile them, so they are only built on request (-PwithParallel).
