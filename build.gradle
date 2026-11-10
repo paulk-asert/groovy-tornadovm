@@ -29,6 +29,13 @@ subprojects {
 
     repositories {
         mavenCentral()
+        if (groovyVersion.endsWith('-SNAPSHOT')) {
+            // e.g. -PgroovyVersion=6.0.1-SNAPSHOT, ahead of a release
+            maven {
+                url = 'https://repository.apache.org/content/groups/snapshots/'
+                mavenContent { snapshotsOnly() }
+            }
+        }
     }
 
     java {

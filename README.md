@@ -52,15 +52,17 @@ TORNADOVM_HOME=$PWD/sdk/tornadovm-8.0.0-opencl ./gradlew :examples:runMandelbrot
 ```
 
 The `@Parallel` examples are only built with `-PwithParallel`. Groovy 6.0.0 fails to compile them
-(GROOVY-12540). Until a Groovy release with the fixes is available, point the build at a local
-Groovy build that includes them:
+(GROOVY-12540). Until a Groovy release with the fixes is available, use a snapshot build. For a
+`-SNAPSHOT` version, the build also looks in the
+[Apache snapshots repository](https://repository.apache.org/content/groups/snapshots/org/apache/groovy/groovy/):
 
 ```
-./gradlew -PwithParallel -PgroovyHome=/path/to/groovy/subprojects/groovy-binary/build/install \
+./gradlew -PwithParallel -PgroovyVersion=6.0.1-SNAPSHOT \
     :parallel:runVectorAddParallel :parallel:runMandelbrotParallel
 ```
 
-Once released, `-PwithParallel -PgroovyVersion=<version>` will do.
+Once 6.0.1 is released, `-PwithParallel -PgroovyVersion=6.0.1` will do. To use a local Groovy build
+instead, pass `-PgroovyHome=/path/to/groovy/subprojects/groovy-binary/build/install`.
 
 ## Intel GPUs on Windows
 
