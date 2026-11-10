@@ -36,6 +36,9 @@ gh release download v8.0.0 -R beehive-lab/TornadoVM \
 for f in *.tar.gz; do tar xzf $f; done
 ```
 
+On Windows, use the `jdk21` OpenCL SDK, `tornadovm-8.0.0-jdk21-opencl-windows-amd64.zip`,
+unzipped into `sdk/` (giving `sdk/tornadovm-8.0.0-opencl`).
+
 The build uses `TORNADOVM_HOME` if set, otherwise `sdk/tornadovm-8.0.0-metal`.
 Check that TornadoVM can see your GPU with `$TORNADOVM_HOME/bin/tornado --devices`.
 
@@ -58,6 +61,22 @@ Groovy build that includes them:
 ```
 
 Once released, `-PwithParallel -PgroovyVersion=<version>` will do.
+
+## Intel GPUs on Windows
+
+The examples also run on Windows 11 with an Intel Arc B390 integrated GPU (Core Ultra X7 358H),
+using the OpenCL SDK above. From Git Bash:
+
+```
+export TORNADOVM_HOME=$PWD/sdk/tornadovm-8.0.0-opencl
+./gradlew :examples:runVectorAdd -PtornadoFlags=--devices   # lists the Intel GPU
+./gradlew :examples:runVectorAdd :examples:runMandelbrot
+```
+
+The Mandelbrot kernel took about 9 ms per 3840×3200 image (13.9 ms for the `@Parallel` version,
+built with a Groovy 6.0.1-SNAPSHOT), against about 2.4 s for a parallel stream on the 16 CPU cores.
+Unlike Apple GPUs, this GPU accepts double-precision kernels. A `double` version of the
+Mandelbrot kernel ran, but about 9.5× slower than the `float` one.
 
 ## NVIDIA GPUs on Colab
 

@@ -75,7 +75,8 @@ configure([project(':examples')] + (findProject(':parallel') ? [project(':parall
                 def cp = (p.sourceSets.main.output.classesDirs.files + p.configurations.runtimeClasspath.files).join(File.pathSeparator)
                 environment 'JAVA_HOME', launcher.get().metadata.installationPath.asFile.path
                 environment 'TORNADOVM_HOME', tornadoHome.get()
-                commandLine(["${tornadoHome.get()}/bin/tornado", *flags, '--classpath', cp, name])
+                def exe = System.getProperty('os.name').toLowerCase().contains('windows') ? 'tornado.exe' : 'tornado'
+                commandLine(["${tornadoHome.get()}/bin/$exe", *flags, '--classpath', cp, name])
             }
         }
     }
